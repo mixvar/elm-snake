@@ -7,6 +7,7 @@ import Debug
 import Html exposing (Html, div, h1, text)
 import Html.Attributes exposing (style)
 import List exposing (head, length, take)
+import Time
 
 
 increment val =
@@ -39,9 +40,15 @@ main =
 
 
 type alias Model =
-    { arenaDimensions : ArenaDimensions
+    { gameState : GameState
+    , arenaDimensions : ArenaDimensions
     , snake : Snake
     }
+
+
+type GameState
+    = Running { speedPerSecond : Int }
+    | GameOver
 
 
 type alias ArenaDimensions =
@@ -97,7 +104,7 @@ changeDirection direction snake =
         { snake | direction = direction }
 
 
-move : ArenaDimensions -> Snake -> Result Snake Snake
+move : ArenaDimensions -> Snake -> Result Void Snake
 move dimensions snake =
     -- TODO handle eating apples
     -- TODO handle snake collision
@@ -108,24 +115,20 @@ move dimensions snake =
                 |> Maybe.map (transformPosition snake.direction)
                 |> Maybe.map (toArenaPosition dimensions)
 
-        body =
-            case nextHead of
-                Just head ->
-                    (head :: snake.body)
-                        |> take (length snake.body)
+        cutSnakeBody =
+            take (length snake.body)
 
-                Nothing ->
-                    snake.body
-
-        resultingSnake =
-            { snake | body = body }
+        nextBody =
+            nextHead
+                |> Maybe.map (\head -> head :: snake.body)
+                |> Maybe.map cutSnakeBody
     in
-    case nextHead of
-        Just _ ->
-            Ok resultingSnake
+    case nextBody of
+        Just body ->
+            Ok { snake | body = body }
 
         Nothing ->
-            Err resultingSnake
+            Err ()
 
 
 transformPosition : Direction -> Position -> Position
@@ -138,10 +141,10 @@ transformPosition direction position =
             { position | col = decrement position.col }
 
         Up ->
-            { position | row = increment position.row }
+            { position | row = decrement position.row }
 
         Down ->
-            { position | row = decrement position.row }
+            { position | row = increment position.row }
 
 
 toArenaPosition : ArenaDimensions -> Position -> Position
@@ -162,6 +165,10 @@ toArenaPosition dimensions { col, row } =
     }
 
 
+
+-- INIT
+
+
 init : Void -> ( Model, Cmd Msg )
 init _ =
     ( initialModel, Cmd.none )
@@ -169,7 +176,8 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { arenaDimensions = ArenaDimensions 10 56 34
+    { gameState = Running { speedPerSecond = 6 }
+    , arenaDimensions = ArenaDimensions 7 80 50
     , snake = initialSnake
     }
 
@@ -177,7 +185,7 @@ initialModel =
 initialSnake : Snake
 initialSnake =
     { direction = Up
-    , body = [ Position 28 17, Position 28 18, Position 28 19 ]
+    , body = [ Position 40 25, Position 40 26, Position 40 27, Position 40 28 ]
     }
 
 
@@ -186,7 +194,8 @@ initialSnake =
 
 
 type Msg
-    = Nop
+    = Move
+    | EndGame
 
 
 
@@ -194,8 +203,22 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update _ model =
-    ( model, Cmd.none )
+update msg model =
+    case msg of
+        EndGame ->
+            ( { model | gameState = GameOver }, Cmd.none )
+
+        Move ->
+            let
+                moveResult =
+                    model.snake |> move model.arenaDimensions
+            in
+            case moveResult of
+                Err _ ->
+                    update EndGame model
+
+                Ok nextSnake ->
+                    ( { model | snake = nextSnake }, Cmd.none )
 
 
 
@@ -203,8 +226,13 @@ update _ model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.gameState of
+        Running { speedPerSecond } ->
+            Time.every (1000 / toFloat speedPerSecond) (\_ -> Move)
+
+        GameOver ->
+            Sub.none
 
 
 
@@ -249,6 +277,14 @@ gameArenaView model =
     Canvas.toHtml ( width, height )
         canvasStyles
         [ renderBackground width height Color.black
+
+        --        , shapes [ fill Color.red ]
+        --            (model.snake.body
+        --                |> List.head
+        --                |> Maybe.withDefault (Position 0 0)
+        --                |> renderTile model.arenaDimensions
+        --                |> List.singleton
+        --            )
         , renderSnake model.arenaDimensions model.snake
         ]
 
