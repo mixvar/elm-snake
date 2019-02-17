@@ -177,7 +177,7 @@ initialModel =
 initialSnake : Snake
 initialSnake =
     { direction = Up
-    , body = [ Position 28 17, Position 28 18 ]
+    , body = [ Position 28 17, Position 28 18, Position 28 19 ]
     }
 
 
@@ -249,9 +249,7 @@ gameArenaView model =
     Canvas.toHtml ( width, height )
         canvasStyles
         [ renderBackground width height Color.black
-        , renderTile model.arenaDimensions Color.red (Position 1 1)
-        , renderTile model.arenaDimensions Color.green (Position (cols // 2) (rows // 2))
-        , renderTile model.arenaDimensions Color.blue (Position cols rows)
+        , renderSnake model.arenaDimensions model.snake
         ]
 
 
@@ -260,11 +258,16 @@ renderBackground width height color =
     shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
 
 
-renderTile : ArenaDimensions -> Color -> Position -> Renderable
-renderTile dims color coords =
-    renderSquare dims.unitSize (toPoint dims coords) color
+renderSnake : ArenaDimensions -> Snake -> Renderable
+renderSnake dimensions { body } =
+    shapes [ fill Color.white ] (body |> List.map (renderTile dimensions))
 
 
-renderSquare : Int -> Point -> Color -> Renderable
-renderSquare size point color =
-    shapes [ fill color ] [ rect point (toFloat size) (toFloat size) ]
+renderTile : ArenaDimensions -> Position -> Shape
+renderTile dims coords =
+    renderSquare dims.unitSize (toPoint dims coords)
+
+
+renderSquare : Int -> Point -> Shape
+renderSquare size point =
+    rect point (toFloat size) (toFloat size)
