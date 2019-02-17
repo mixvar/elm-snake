@@ -6,6 +6,15 @@ import Color exposing (Color)
 import Debug
 import Html exposing (Html, div, h1, text)
 import Html.Attributes exposing (style)
+import List exposing (head, length, take)
+
+
+increment val =
+    val + 1
+
+
+decrement val =
+    val - 1
 
 
 
@@ -34,27 +43,95 @@ type alias Model =
 
 
 type alias ArenaDimensions =
-    { pixelSize : Int, cols : Int, rows : Int }
+    { unitSize : Int, cols : Int, rows : Int }
 
 
 type alias Position =
     { col : Int, row : Int }
 
 
-
--- TODO validate if Position is ok?
-
-
 toPoint : ArenaDimensions -> Position -> Point
-toPoint { pixelSize } { col, row } =
+toPoint { unitSize } { col, row } =
     let
-        x =
-            toFloat <| (col - 1) * pixelSize
-
-        y =
-            toFloat <| (row - 1) * pixelSize
+        toPixels =
+            decrement >> (*) unitSize >> toFloat
     in
-    ( x, y )
+    ( toPixels col, toPixels row )
+
+
+type Direction
+    = Right
+    | Left
+    | Up
+    | Down
+
+
+type alias Snake =
+    { body : List Position, direction : Direction }
+
+
+changeDirection : Direction -> Snake -> Snake
+changeDirection direction snake =
+    { snake | direction = direction }
+
+
+move : ArenaDimensions -> Snake -> Result Snake Snake
+move dimensions snake =
+    -- TODO handle eating apples
+    -- TODO handle snake collision
+    let
+        nextHead =
+            snake.body
+                |> head
+                |> Maybe.map (transformPosition snake.direction)
+                |> Maybe.map (toArenaPosition dimensions)
+
+        body =
+            case nextHead of
+                Just head ->
+                    (head :: snake.body)
+                        |> take (length snake.body)
+
+                Nothing ->
+                    snake.body
+
+        resultingSnake =
+            { snake | body = body }
+    in
+    case nextHead of
+        Just _ ->
+            Ok resultingSnake
+
+        Nothing ->
+            Err resultingSnake
+
+
+transformPosition : Direction -> Position -> Position
+transformPosition direction position =
+    case direction of
+        Right ->
+            { position | col = increment position.col }
+
+        Left ->
+            { position | col = decrement position.col }
+
+        Up ->
+            { position | col = increment position.row }
+
+        Down ->
+            { position | col = decrement position.row }
+
+
+toArenaPosition : ArenaDimensions -> Position -> Position
+toArenaPosition { cols, rows } position =
+    let
+        boundedCol =
+            position.col
+
+        boundedRow =
+            position.row
+    in
+    { col = boundedCol, row = boundedRow }
 
 
 init : Void -> ( Model, Cmd Msg )
@@ -64,7 +141,7 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { arenaDimensions = ArenaDimensions 20 26 16 }
+    { arenaDimensions = ArenaDimensions 10 56 34 }
 
 
 
@@ -116,14 +193,14 @@ titleView =
 gameArenaView : Model -> Html Msg
 gameArenaView model =
     let
-        { pixelSize, cols, rows } =
+        { unitSize, cols, rows } =
             model.arenaDimensions
 
         width =
-            pixelSize * cols
+            unitSize * cols
 
         height =
-            pixelSize * rows
+            unitSize * rows
 
         canvasStyles =
             [ style "position" "absolute"
@@ -148,7 +225,7 @@ renderBackground width height color =
 
 renderTile : ArenaDimensions -> Color -> Position -> Renderable
 renderTile dims color coords =
-    renderSquare dims.pixelSize (toPoint dims coords) color
+    renderSquare dims.unitSize (toPoint dims coords) color
 
 
 renderSquare : Int -> Point -> Color -> Renderable
