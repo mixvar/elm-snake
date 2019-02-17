@@ -39,7 +39,9 @@ main =
 
 
 type alias Model =
-    { arenaDimensions : ArenaDimensions }
+    { arenaDimensions : ArenaDimensions
+    , snake : Snake
+    }
 
 
 type alias ArenaDimensions =
@@ -66,13 +68,33 @@ type Direction
     | Down
 
 
+opposite : Direction -> Direction
+opposite dir =
+    case dir of
+        Right ->
+            Left
+
+        Left ->
+            Right
+
+        Up ->
+            Down
+
+        Down ->
+            Up
+
+
 type alias Snake =
     { body : List Position, direction : Direction }
 
 
 changeDirection : Direction -> Snake -> Snake
 changeDirection direction snake =
-    { snake | direction = direction }
+    if direction == opposite snake.direction then
+        snake
+
+    else
+        { snake | direction = direction }
 
 
 move : ArenaDimensions -> Snake -> Result Snake Snake
@@ -116,22 +138,28 @@ transformPosition direction position =
             { position | col = decrement position.col }
 
         Up ->
-            { position | col = increment position.row }
+            { position | row = increment position.row }
 
         Down ->
-            { position | col = decrement position.row }
+            { position | row = decrement position.row }
 
 
 toArenaPosition : ArenaDimensions -> Position -> Position
-toArenaPosition { cols, rows } position =
+toArenaPosition dimensions { col, row } =
     let
-        boundedCol =
-            position.col
+        bounded limit v =
+            if v > limit then
+                1
 
-        boundedRow =
-            position.row
+            else if v < 1 then
+                limit
+
+            else
+                v
     in
-    { col = boundedCol, row = boundedRow }
+    { col = col |> bounded dimensions.cols
+    , row = row |> bounded dimensions.rows
+    }
 
 
 init : Void -> ( Model, Cmd Msg )
@@ -141,7 +169,16 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { arenaDimensions = ArenaDimensions 10 56 34 }
+    { arenaDimensions = ArenaDimensions 10 56 34
+    , snake = initialSnake
+    }
+
+
+initialSnake : Snake
+initialSnake =
+    { direction = Up
+    , body = [ Position 28 17, Position 28 18 ]
+    }
 
 
 

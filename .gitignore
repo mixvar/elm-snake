@@ -3,3 +3,5 @@
 elm-stuff
 
 src/*.js
+
+node_modules
