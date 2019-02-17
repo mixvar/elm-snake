@@ -2,8 +2,8 @@ module Main exposing (main)
 
 import Browser
 import Canvas exposing (..)
-import Color
-import Html exposing (Html, div, text)
+import Color exposing (Color)
+import Html exposing (Html, div, h1, text)
 import Html.Attributes exposing (style)
 
 
@@ -43,7 +43,7 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { arenaDimensions = ArenaDimensions 45 24 12 }
+    { arenaDimensions = ArenaDimensions 20 26 16 }
 
 
 
@@ -87,9 +87,9 @@ view model =
 titleView =
     let
         styles =
-            [ style "text-align" "center", style "font-size" "36px" ]
+            [ style "text-align" "center", style "font-size" "40px" ]
     in
-    div styles [ text "elm-snake" ]
+    h1 styles [ text "elm-snake" ]
 
 
 
@@ -109,7 +109,7 @@ gameArenaView model =
             pixelSize * rows
 
         canvasStyles =
-            [ style "border" "1px solid red"
+            [ style "border" "2px solid white"
             , style "position" "absolute"
             , style "top" "50%"
             , style "left" "50%"
@@ -118,5 +118,16 @@ gameArenaView model =
     in
     Canvas.toHtml ( width, height )
         canvasStyles
-        [ shapes [ fill Color.red ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
+        [ renderBackground width height Color.black
+        , renderSquare pixelSize ( 0, 0 ) Color.green
         ]
+
+
+renderBackground : Int -> Int -> Color -> Renderable
+renderBackground width height color =
+    shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
+
+
+renderSquare : Int -> Point -> Color -> Renderable
+renderSquare size ( x, y ) color =
+    shapes [ fill color ] [ rect ( x, y ) (toFloat size) (toFloat size) ]

@@ -1,3 +1,5 @@
 .idea
 
 elm-stuff
+
+src/*.js
