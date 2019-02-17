@@ -1,0 +1,15 @@
+{
+  "name": "elm-snake",
+  "version": "1.0.0",
+  "description": "elm snake game using canvas",
+  "main": "src/Main.elm",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "elm-live src/Main.elm --open --port=3300 --start-page=src/index.html -- --output=src/Main.elm.js"
+  },
+  "author": "Mikolaj Klaman",
+  "license": "MIT",
+  "devDependencies": {
+    "elm-live": "^3.4.0"
+  }
+}
