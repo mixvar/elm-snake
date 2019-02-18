@@ -1,11 +1,13 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Events exposing (onKeyDown)
 import Canvas exposing (..)
 import Color exposing (Color)
 import Debug
 import Html exposing (Html, div, h1, text)
 import Html.Attributes exposing (style)
+import Json.Decode as Decode exposing (Decoder)
 import List exposing (head, length, take)
 import Time
 
@@ -75,6 +77,37 @@ type Direction
     | Down
 
 
+directionFromKey : String -> Maybe Direction
+directionFromKey key =
+    case key of
+        "w" ->
+            Just Up
+
+        "ArrowUp" ->
+            Just Up
+
+        "s" ->
+            Just Down
+
+        "ArrowDown" ->
+            Just Down
+
+        "a" ->
+            Just Left
+
+        "ArrowLeft" ->
+            Just Left
+
+        "d" ->
+            Just Right
+
+        "ArrowRight" ->
+            Just Right
+
+        _ ->
+            Nothing
+
+
 opposite : Direction -> Direction
 opposite dir =
     case dir of
@@ -95,8 +128,8 @@ type alias Snake =
     { body : List Position, direction : Direction }
 
 
-changeDirection : Direction -> Snake -> Snake
-changeDirection direction snake =
+turn : Direction -> Snake -> Snake
+turn direction snake =
     if direction == opposite snake.direction then
         snake
 
@@ -195,6 +228,8 @@ initialSnake =
 
 type Msg
     = Move
+    | KeyPressed String
+    | Turn Direction
     | EndGame
 
 
@@ -220,6 +255,21 @@ update msg model =
                 Ok nextSnake ->
                     ( { model | snake = nextSnake }, Cmd.none )
 
+        KeyPressed key ->
+            let
+                direction =
+                    directionFromKey key
+            in
+            case direction of
+                Just dir ->
+                    update (Turn dir) model
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Turn direction ->
+            ( { model | snake = model.snake |> turn direction }, Cmd.none )
+
 
 
 -- SUBSCRIPTIONS
@@ -229,10 +279,23 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.gameState of
         Running { speedPerSecond } ->
-            Time.every (1000 / toFloat speedPerSecond) (\_ -> Move)
+            let
+                moveSub =
+                    Time.every (1000 / toFloat speedPerSecond) (\_ -> Move)
+
+                keyPressedSub =
+                    onKeyDown keyPressedDecoder
+            in
+            Sub.batch [ moveSub, keyPressedSub ]
 
         GameOver ->
             Sub.none
+
+
+keyPressedDecoder : Decode.Decoder Msg
+keyPressedDecoder =
+    Decode.field "key" Decode.string
+        |> Decode.map KeyPressed
 
 
 
