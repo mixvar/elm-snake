@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Browser
-import Browser.Events exposing (onKeyDown)
+import Browser.Events
 import Canvas exposing (..)
 import Color exposing (Color)
 import Debug
@@ -125,7 +125,10 @@ opposite dir =
 
 
 type alias Snake =
-    { body : List Position, direction : Direction }
+    { body : List Position
+    , direction : Direction
+    , nextDirection : Direction
+    }
 
 
 turn : Direction -> Snake -> Snake
@@ -134,18 +137,17 @@ turn direction snake =
         snake
 
     else
-        { snake | direction = direction }
+        { snake | nextDirection = direction }
 
 
 move : ArenaDimensions -> Snake -> Result Void Snake
 move dimensions snake =
     -- TODO handle eating apples
-    -- TODO handle snake collision
     let
         nextHead =
             snake.body
                 |> head
-                |> Maybe.map (transformPosition snake.direction)
+                |> Maybe.map (transformPosition snake.nextDirection)
                 |> Maybe.map (toArenaPosition dimensions)
 
         cutSnakeBody =
@@ -159,7 +161,7 @@ move dimensions snake =
     in
     case nextBody of
         Just body ->
-            Ok { snake | body = body }
+            Ok { snake | body = body, direction = snake.nextDirection }
 
         Nothing ->
             Err ()
@@ -233,7 +235,8 @@ initialModel =
 initialSnake : Snake
 initialSnake =
     { direction = Up
-    , body = [ Position 40 25, Position 40 26, Position 40 27, Position 40 28, Position 40 29, Position 40 30, Position 40 31, Position 40 32 ]
+    , nextDirection = Up
+    , body = List.range 25 30 |> List.map (\y -> Position 40 y)
     }
 
 
@@ -283,7 +286,6 @@ update msg model =
                     ( model, Cmd.none )
 
         Turn direction ->
-            --- TODO fix snake ability to turn 180
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
 
 
@@ -300,7 +302,7 @@ subscriptions model =
                     Time.every (1000 / toFloat speedPerSecond) (\_ -> Move)
 
                 keyPressedSub =
-                    onKeyDown keyPressedDecoder
+                    Browser.Events.onKeyDown keyPressedDecoder
             in
             Sub.batch [ moveSub, keyPressedSub ]
 
