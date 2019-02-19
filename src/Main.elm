@@ -155,6 +155,7 @@ move dimensions snake =
             nextHead
                 |> Maybe.map (\head -> head :: snake.body)
                 |> Maybe.map cutSnakeBody
+                |> Maybe.andThen validateCollisions
     in
     case nextBody of
         Just body ->
@@ -162,6 +163,20 @@ move dimensions snake =
 
         Nothing ->
             Err ()
+
+
+validateCollisions : List Position -> Maybe (List Position)
+validateCollisions body =
+    case body of
+        head :: tail ->
+            if List.member head tail then
+                Nothing
+
+            else
+                Just body
+
+        _ ->
+            Nothing
 
 
 transformPosition : Direction -> Position -> Position
@@ -209,7 +224,7 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { gameState = Running { speedPerSecond = 6 }
+    { gameState = Running { speedPerSecond = 10 }
     , arenaDimensions = ArenaDimensions 7 80 50
     , snake = initialSnake
     }
@@ -218,7 +233,7 @@ initialModel =
 initialSnake : Snake
 initialSnake =
     { direction = Up
-    , body = [ Position 40 25, Position 40 26, Position 40 27, Position 40 28 ]
+    , body = [ Position 40 25, Position 40 26, Position 40 27, Position 40 28, Position 40 29, Position 40 30, Position 40 31, Position 40 32 ]
     }
 
 
@@ -250,7 +265,7 @@ update msg model =
             in
             case moveResult of
                 Err _ ->
-                    update EndGame model
+                    model |> update EndGame
 
                 Ok nextSnake ->
                     ( { model | snake = nextSnake }, Cmd.none )
@@ -262,12 +277,13 @@ update msg model =
             in
             case direction of
                 Just dir ->
-                    update (Turn dir) model
+                    model |> update (Turn dir)
 
                 Nothing ->
                     ( model, Cmd.none )
 
         Turn direction ->
+            --- TODO fix snake ability to turn 180
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
 
 
@@ -340,15 +356,7 @@ gameArenaView model =
     Canvas.toHtml ( width, height )
         canvasStyles
         [ renderBackground width height Color.black
-
-        --        , shapes [ fill Color.red ]
-        --            (model.snake.body
-        --                |> List.head
-        --                |> Maybe.withDefault (Position 0 0)
-        --                |> renderTile model.arenaDimensions
-        --                |> List.singleton
-        --            )
-        , renderSnake model.arenaDimensions model.snake
+        , renderSnake model
         ]
 
 
@@ -357,9 +365,10 @@ renderBackground width height color =
     shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
 
 
-renderSnake : ArenaDimensions -> Snake -> Renderable
-renderSnake dimensions { body } =
-    shapes [ fill Color.white ] (body |> List.map (renderTile dimensions))
+renderSnake : Model -> Renderable
+renderSnake model =
+    shapes [ fill (snakeColor model.gameState) ]
+        (model.snake.body |> List.map (renderTile model.arenaDimensions))
 
 
 renderTile : ArenaDimensions -> Position -> Shape
@@ -370,3 +379,13 @@ renderTile dims coords =
 renderSquare : Int -> Point -> Shape
 renderSquare size point =
     rect point (toFloat size) (toFloat size)
+
+
+snakeColor : GameState -> Color
+snakeColor state =
+    case state of
+        Running _ ->
+            Color.white
+
+        GameOver ->
+            Color.red
