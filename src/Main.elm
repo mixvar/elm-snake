@@ -5,7 +5,7 @@ import Browser.Events
 import Canvas exposing (..)
 import Color exposing (Color)
 import Debug
-import Html exposing (Html, div, h1, text)
+import Html exposing (Html, div, h1)
 import Html.Attributes exposing (style)
 import Json.Decode as Decode exposing (Decoder)
 import List exposing (head, length, take)
@@ -45,6 +45,7 @@ type alias Model =
     { gameState : GameState
     , arenaDimensions : ArenaDimensions
     , snake : Snake
+    , apple : Maybe Position
     }
 
 
@@ -229,6 +230,7 @@ initialModel =
     { gameState = Running { speedPerSecond = 10 }
     , arenaDimensions = ArenaDimensions 7 80 50
     , snake = initialSnake
+    , apple = Just (Position 15 20) -- TODO start with Nothing
     }
 
 
@@ -333,7 +335,7 @@ titleView =
         styles =
             [ style "text-align" "center", style "font-size" "40px" ]
     in
-    h1 styles [ text "elm-snake" ]
+    h1 styles [ Html.text "elm-snake" ]
 
 
 gameArenaView : Model -> Html Msg
@@ -358,6 +360,7 @@ gameArenaView model =
     Canvas.toHtml ( width, height )
         canvasStyles
         [ renderBackground width height Color.black
+        , renderApple model
         , renderSnake model
         ]
 
@@ -365,6 +368,15 @@ gameArenaView model =
 renderBackground : Int -> Int -> Color -> Renderable
 renderBackground width height color =
     shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
+
+
+renderApple : Model -> Renderable
+renderApple { apple, arenaDimensions } =
+    apple
+        |> Maybe.map (renderTile arenaDimensions)
+        |> Maybe.map List.singleton
+        |> Maybe.withDefault []
+        |> shapes [ fill Color.red ]
 
 
 renderSnake : Model -> Renderable
@@ -387,7 +399,7 @@ snakeColor : GameState -> Color
 snakeColor state =
     case state of
         Running _ ->
-            Color.white
+            Color.green
 
         GameOver ->
             Color.red
