@@ -254,7 +254,7 @@ init _ =
 initialModel : Model
 initialModel =
     { gameState = Running
-    , score = 0
+    , score = 1
     , arenaDimensions = ArenaDimensions 17 36 20
     , snake = initialSnake
     , apple = Position 18 5
@@ -299,7 +299,18 @@ update msg model =
             )
 
         TimePenalty ->
-            ( { model | score = model.score - 1 }, Cmd.none )
+            let
+                score =
+                    model.score - 1
+
+                state =
+                    if score < 0 then
+                        GameOver
+
+                    else
+                        Running
+            in
+            ( { model | score = score, gameState = state }, Cmd.none )
 
         Move ->
             let
