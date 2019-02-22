@@ -142,12 +142,12 @@ turn direction snake =
     { snake | turnQueue = List.append snake.turnQueue [ direction ] }
 
 
-getNextDirection : Snake -> ( Direction, List Direction )
-getNextDirection snake =
+getNextTurn : Snake -> ( Direction, List Direction )
+getNextTurn snake =
     case List.head snake.turnQueue of
         Just nextDir ->
             if nextDir == opposite snake.direction || nextDir == snake.direction then
-                getNextDirection { snake | turnQueue = List.drop 1 snake.turnQueue }
+                getNextTurn { snake | turnQueue = List.drop 1 snake.turnQueue }
 
             else
                 ( nextDir, List.drop 1 snake.turnQueue )
@@ -166,7 +166,7 @@ move : ArenaDimensions -> Apple -> Snake -> MoveResult
 move dimensions apple snake =
     let
         ( direction, turnQueue ) =
-            getNextDirection snake
+            getNextTurn snake
 
         maybeNextHead =
             snake.body
@@ -267,7 +267,7 @@ init _ =
 initialModel : Model
 initialModel =
     { gameState = Running
-    , score = 1
+    , score = 0
     , arenaDimensions = ArenaDimensions 17 36 20
     , snake = initialSnake
     , apple = Position 18 5
