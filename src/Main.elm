@@ -45,7 +45,7 @@ type alias Model =
     { gameState : GameState
     , arenaDimensions : ArenaDimensions
     , snake : Snake
-    , apple : Maybe Position
+    , apple : Apple
     }
 
 
@@ -60,6 +60,10 @@ type alias ArenaDimensions =
 
 type alias Position =
     { col : Int, row : Int }
+
+
+type alias Apple =
+    Position
 
 
 toPoint : ArenaDimensions -> Position -> Point
@@ -141,31 +145,52 @@ turn direction snake =
         { snake | nextDirection = direction }
 
 
-move : ArenaDimensions -> Snake -> Result Void Snake
-move dimensions snake =
-    -- TODO handle eating apples
+type MoveResult
+    = Moved Snake
+    | MovedAndFed Snake
+    | Collision
+
+
+move : ArenaDimensions -> Apple -> Snake -> MoveResult
+move dimensions apple snake =
     let
-        nextHead =
+        maybeNextHead =
             snake.body
                 |> head
                 |> Maybe.map (transformPosition snake.nextDirection)
                 |> Maybe.map (toArenaPosition dimensions)
 
-        cutSnakeBody =
-            take (length snake.body)
+        snakeFed =
+            maybeNextHead
+                |> Maybe.map ((==) apple)
+                |> Maybe.withDefault False
 
-        nextBody =
-            nextHead
+        adjustBody =
+            if snakeFed then
+                identity
+
+            else
+                take (length snake.body)
+
+        maybeNextSnake =
+            maybeNextHead
                 |> Maybe.map (\head -> head :: snake.body)
-                |> Maybe.map cutSnakeBody
+                |> Maybe.map adjustBody
                 |> Maybe.andThen validateCollisions
+                |> Maybe.map
+                    (\body ->
+                        { snake | body = body, direction = snake.nextDirection }
+                    )
     in
-    case nextBody of
-        Just body ->
-            Ok { snake | body = body, direction = snake.nextDirection }
+    case ( maybeNextSnake, snakeFed ) of
+        ( Just nextSnake, True ) ->
+            MovedAndFed nextSnake
 
-        Nothing ->
-            Err ()
+        ( Just nextSnake, False ) ->
+            Moved nextSnake
+
+        ( Nothing, _ ) ->
+            Collision
 
 
 validateCollisions : List Position -> Maybe (List Position)
@@ -227,10 +252,10 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { gameState = Running { speedPerSecond = 10 }
+    { gameState = Running { speedPerSecond = 15 }
     , arenaDimensions = ArenaDimensions 7 80 50
     , snake = initialSnake
-    , apple = Just (Position 15 20) -- TODO start with Nothing
+    , apple = Position 40 15
     }
 
 
@@ -238,7 +263,7 @@ initialSnake : Snake
 initialSnake =
     { direction = Up
     , nextDirection = Up
-    , body = List.range 25 30 |> List.map (\y -> Position 40 y)
+    , body = List.range 35 40 |> List.map (\y -> Position 40 y)
     }
 
 
@@ -266,13 +291,17 @@ update msg model =
         Move ->
             let
                 moveResult =
-                    model.snake |> move model.arenaDimensions
+                    model.snake |> move model.arenaDimensions model.apple
             in
             case moveResult of
-                Err _ ->
+                Collision ->
                     model |> update EndGame
 
-                Ok nextSnake ->
+                Moved nextSnake ->
+                    ( { model | snake = nextSnake }, Cmd.none )
+
+                MovedAndFed nextSnake ->
+                    -- TODO generate next apple
                     ( { model | snake = nextSnake }, Cmd.none )
 
         KeyPressed key ->
@@ -372,11 +401,7 @@ renderBackground width height color =
 
 renderApple : Model -> Renderable
 renderApple { apple, arenaDimensions } =
-    apple
-        |> Maybe.map (renderTile arenaDimensions)
-        |> Maybe.map List.singleton
-        |> Maybe.withDefault []
-        |> shapes [ fill Color.red ]
+    shapes [ fill Color.red ] [ renderTile arenaDimensions apple ]
 
 
 renderSnake : Model -> Renderable
