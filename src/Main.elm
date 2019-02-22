@@ -9,6 +9,7 @@ import Html exposing (Html, div, h1)
 import Html.Attributes exposing (style)
 import Json.Decode as Decode exposing (Decoder)
 import List exposing (head, length, take)
+import Random
 import Time
 
 
@@ -273,6 +274,7 @@ initialSnake =
 
 type Msg
     = Move
+    | NewApple Apple
     | KeyPressed String
     | Turn Direction
     | EndGame
@@ -301,8 +303,12 @@ update msg model =
                     ( { model | snake = nextSnake }, Cmd.none )
 
                 MovedAndFed nextSnake ->
-                    -- TODO generate next apple
-                    ( { model | snake = nextSnake }, Cmd.none )
+                    ( { model | snake = nextSnake }
+                    , Random.generate NewApple (appleGenerator model.arenaDimensions)
+                    )
+
+        NewApple apple ->
+            ( { model | apple = apple }, Cmd.none )
 
         KeyPressed key ->
             let
@@ -318,6 +324,11 @@ update msg model =
 
         Turn direction ->
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
+
+
+appleGenerator : ArenaDimensions -> Random.Generator Apple
+appleGenerator { cols, rows } =
+    Random.map2 Position (Random.int 1 cols) (Random.int 1 rows)
 
 
 
