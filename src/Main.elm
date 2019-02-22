@@ -4,7 +4,6 @@ import Browser
 import Browser.Events
 import Canvas exposing (..)
 import Color exposing (Color)
-import Debug
 import Html exposing (Html, div, h1)
 import Html.Attributes exposing (style)
 import Json.Decode as Decode exposing (Decoder)
@@ -44,6 +43,7 @@ main =
 
 type alias Model =
     { gameState : GameState
+    , score : Int
     , arenaDimensions : ArenaDimensions
     , snake : Snake
     , apple : Apple
@@ -51,7 +51,7 @@ type alias Model =
 
 
 type GameState
-    = Running { speedPerSecond : Int }
+    = Running
     | GameOver
 
 
@@ -253,7 +253,8 @@ init _ =
 
 initialModel : Model
 initialModel =
-    { gameState = Running { speedPerSecond = 15 }
+    { gameState = Running
+    , score = 0
     , arenaDimensions = ArenaDimensions 17 36 20
     , snake = initialSnake
     , apple = Position 18 5
@@ -275,6 +276,8 @@ initialSnake =
 type Msg
     = Move
     | NewApple Apple
+    | EatApple
+    | TimePenalty
     | KeyPressed String
     | Turn Direction
     | EndGame
@@ -290,6 +293,14 @@ update msg model =
         EndGame ->
             ( { model | gameState = GameOver }, Cmd.none )
 
+        EatApple ->
+            ( { model | score = model.score + 20 }
+            , Random.generate NewApple (appleGenerator model.arenaDimensions)
+            )
+
+        TimePenalty ->
+            ( { model | score = model.score - 1 }, Cmd.none )
+
         Move ->
             let
                 moveResult =
@@ -303,9 +314,7 @@ update msg model =
                     ( { model | snake = nextSnake }, Cmd.none )
 
                 MovedAndFed nextSnake ->
-                    ( { model | snake = nextSnake }
-                    , Random.generate NewApple (appleGenerator model.arenaDimensions)
-                    )
+                    { model | snake = nextSnake } |> update EatApple
 
         NewApple apple ->
             ( { model | apple = apple }, Cmd.none )
@@ -338,15 +347,18 @@ appleGenerator { cols, rows } =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.gameState of
-        Running { speedPerSecond } ->
+        Running ->
             let
                 moveSub =
-                    Time.every (1000 / toFloat speedPerSecond) (\_ -> Move)
+                    Time.every (1000 / toFloat (speedPerSecond model.score)) (\_ -> Move)
+
+                timePenaltySub =
+                    Time.every 1000 (\_ -> TimePenalty)
 
                 keyPressedSub =
                     Browser.Events.onKeyDown keyPressedDecoder
             in
-            Sub.batch [ moveSub, keyPressedSub ]
+            Sub.batch [ moveSub, timePenaltySub, keyPressedSub ]
 
         GameOver ->
             Sub.none
@@ -358,6 +370,11 @@ keyPressedDecoder =
         |> Decode.map KeyPressed
 
 
+speedPerSecond : Int -> Int
+speedPerSecond score =
+    10 + (score // 200)
+
+
 
 -- VIEW
 
@@ -366,6 +383,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ titleView
+        , scoreView model.score
         , gameArenaView model
         ]
 
@@ -373,9 +391,18 @@ view model =
 titleView =
     let
         styles =
-            [ style "text-align" "center", style "font-size" "40px" ]
+            [ style "text-align" "center", style "font-size" "40px", style "margin-bottom" "10px" ]
     in
     h1 styles [ Html.text "elm-snake" ]
+
+
+scoreView : Int -> Html msg
+scoreView score =
+    let
+        styles =
+            [ style "text-align" "center", style "font-size" "24px", style "color" "red" ]
+    in
+    div styles [ Html.text ("score: " ++ String.fromInt score) ]
 
 
 gameArenaView : Model -> Html Msg
@@ -392,7 +419,7 @@ gameArenaView model =
 
         canvasStyles =
             [ style "position" "absolute"
-            , style "top" "50%"
+            , style "top" "55%"
             , style "left" "50%"
             , style "transform" "translate(-50%, -50%)"
             ]
@@ -434,7 +461,7 @@ renderSquare size point =
 snakeColor : GameState -> Color
 snakeColor state =
     case state of
-        Running _ ->
+        Running ->
             Color.green
 
         GameOver ->
