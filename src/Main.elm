@@ -133,17 +133,27 @@ opposite dir =
 type alias Snake =
     { body : List Position
     , direction : Direction
-    , nextDirection : Direction
+    , turnQueue : List Direction
     }
 
 
 turn : Direction -> Snake -> Snake
 turn direction snake =
-    if direction == opposite snake.direction then
-        snake
+    { snake | turnQueue = List.append snake.turnQueue [ direction ] }
 
-    else
-        { snake | nextDirection = direction }
+
+getNextDirection : Snake -> ( Direction, List Direction )
+getNextDirection snake =
+    case List.head snake.turnQueue of
+        Just nextDir ->
+            if nextDir == opposite snake.direction || nextDir == snake.direction then
+                getNextDirection { snake | turnQueue = List.drop 1 snake.turnQueue }
+
+            else
+                ( nextDir, List.drop 1 snake.turnQueue )
+
+        Nothing ->
+            ( snake.direction, [] )
 
 
 type MoveResult
@@ -155,10 +165,13 @@ type MoveResult
 move : ArenaDimensions -> Apple -> Snake -> MoveResult
 move dimensions apple snake =
     let
+        ( direction, turnQueue ) =
+            getNextDirection snake
+
         maybeNextHead =
             snake.body
                 |> head
-                |> Maybe.map (transformPosition snake.nextDirection)
+                |> Maybe.map (transformPosition direction)
                 |> Maybe.map (toArenaPosition dimensions)
 
         snakeFed =
@@ -180,7 +193,7 @@ move dimensions apple snake =
                 |> Maybe.andThen validateCollisions
                 |> Maybe.map
                     (\body ->
-                        { snake | body = body, direction = snake.nextDirection }
+                        { snake | body = body, direction = direction, turnQueue = turnQueue }
                     )
     in
     case ( maybeNextSnake, snakeFed ) of
@@ -264,7 +277,7 @@ initialModel =
 initialSnake : Snake
 initialSnake =
     { direction = Up
-    , nextDirection = Up
+    , turnQueue = []
     , body = List.range 15 20 |> List.map (\y -> Position 18 y)
     }
 
@@ -299,18 +312,7 @@ update msg model =
             )
 
         TimePenalty ->
-            let
-                score =
-                    model.score - 1
-
-                state =
-                    if score < 0 then
-                        GameOver
-
-                    else
-                        Running
-            in
-            ( { model | score = score, gameState = state }, Cmd.none )
+            ( { model | score = model.score - 1 }, Cmd.none )
 
         Move ->
             let
