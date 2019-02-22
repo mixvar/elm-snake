@@ -254,9 +254,9 @@ init _ =
 initialModel : Model
 initialModel =
     { gameState = Running { speedPerSecond = 15 }
-    , arenaDimensions = ArenaDimensions 7 80 50
+    , arenaDimensions = ArenaDimensions 17 36 20
     , snake = initialSnake
-    , apple = Position 40 15
+    , apple = Position 18 5
     }
 
 
@@ -264,7 +264,7 @@ initialSnake : Snake
 initialSnake =
     { direction = Up
     , nextDirection = Up
-    , body = List.range 35 40 |> List.map (\y -> Position 40 y)
+    , body = List.range 15 20 |> List.map (\y -> Position 18 y)
     }
 
 
