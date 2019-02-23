@@ -46,7 +46,7 @@ type alias Model =
     , score : Int
     , arenaDimensions : ArenaDimensions
     , snake : Snake
-    , apple : Apple
+    , fruit : Fruit
     }
 
 
@@ -63,7 +63,7 @@ type alias Position =
     { col : Int, row : Int }
 
 
-type alias Apple =
+type alias Fruit =
     Position
 
 
@@ -162,8 +162,8 @@ type MoveResult
     | Collision
 
 
-move : ArenaDimensions -> Apple -> Snake -> MoveResult
-move dimensions apple snake =
+move : ArenaDimensions -> Fruit -> Snake -> MoveResult
+move dimensions fruit snake =
     let
         ( direction, turnQueue ) =
             getNextTurn snake
@@ -176,7 +176,7 @@ move dimensions apple snake =
 
         snakeFed =
             maybeNextHead
-                |> Maybe.map ((==) apple)
+                |> Maybe.map ((==) fruit)
                 |> Maybe.withDefault False
 
         adjustBody =
@@ -268,9 +268,9 @@ initialModel : Model
 initialModel =
     { gameState = Running
     , score = 0
-    , arenaDimensions = ArenaDimensions 17 36 20
+    , arenaDimensions = ArenaDimensions 18 30 18
     , snake = initialSnake
-    , apple = Position 18 5
+    , fruit = Position 15 3
     }
 
 
@@ -278,7 +278,7 @@ initialSnake : Snake
 initialSnake =
     { direction = Up
     , turnQueue = []
-    , body = List.range 15 20 |> List.map (\y -> Position 18 y)
+    , body = List.range 13 18 |> List.map (\y -> Position 15 y)
     }
 
 
@@ -288,8 +288,8 @@ initialSnake =
 
 type Msg
     = Move
-    | NewApple Apple
-    | EatApple
+    | NewFruit Fruit
+    | FruitEaten
     | TimePenalty
     | KeyPressed String
     | Turn Direction
@@ -306,9 +306,9 @@ update msg model =
         EndGame ->
             ( { model | gameState = GameOver }, Cmd.none )
 
-        EatApple ->
+        FruitEaten ->
             ( { model | score = model.score + 20 }
-            , Random.generate NewApple (appleGenerator model.arenaDimensions)
+            , Random.generate NewFruit (fruitGenerator model.arenaDimensions)
             )
 
         TimePenalty ->
@@ -317,7 +317,7 @@ update msg model =
         Move ->
             let
                 moveResult =
-                    model.snake |> move model.arenaDimensions model.apple
+                    model.snake |> move model.arenaDimensions model.fruit
             in
             case moveResult of
                 Collision ->
@@ -327,10 +327,10 @@ update msg model =
                     ( { model | snake = nextSnake }, Cmd.none )
 
                 MovedAndFed nextSnake ->
-                    { model | snake = nextSnake } |> update EatApple
+                    { model | snake = nextSnake } |> update FruitEaten
 
-        NewApple apple ->
-            ( { model | apple = apple }, Cmd.none )
+        NewFruit fruit ->
+            ( { model | fruit = fruit }, Cmd.none )
 
         KeyPressed key ->
             let
@@ -348,8 +348,8 @@ update msg model =
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
 
 
-appleGenerator : ArenaDimensions -> Random.Generator Apple
-appleGenerator { cols, rows } =
+fruitGenerator : ArenaDimensions -> Random.Generator Fruit
+fruitGenerator { cols, rows } =
     Random.map2 Position (Random.int 1 cols) (Random.int 1 rows)
 
 
@@ -385,7 +385,7 @@ keyPressedDecoder =
 
 speedPerSecond : Int -> Float
 speedPerSecond score =
-    10 + (toFloat score * (1 / 200))
+    9 + (toFloat score * (1 / 250))
 
 
 
@@ -395,27 +395,27 @@ speedPerSecond score =
 view : Model -> Html Msg
 view model =
     div []
-        [ titleView
-        , scoreView model.score
+        [ headerView model.score
         , gameArenaView model
         ]
 
 
-titleView =
+headerView : Int -> Html msg
+headerView score =
     let
-        styles =
-            [ style "text-align" "center", style "font-size" "40px", style "margin-bottom" "10px" ]
-    in
-    h1 styles [ Html.text "elm-snake" ]
+        containerStyles =
+            [ style "text-align" "center", style "position" "relative", style "z-index" "10" ]
 
+        titleStyles =
+            [ style "font-size" "40px", style "margin" "5px", style "color" "#60B5CC" ]
 
-scoreView : Int -> Html msg
-scoreView score =
-    let
-        styles =
-            [ style "text-align" "center", style "font-size" "24px", style "color" "red" ]
+        scoreStyles =
+            [ style "font-size" "24px" ]
     in
-    div styles [ Html.text ("score: " ++ String.fromInt score) ]
+    div containerStyles
+        [ h1 titleStyles [ Html.text "elm-snake" ]
+        , div scoreStyles [ Html.text ("score: " ++ String.fromInt score) ]
+        ]
 
 
 gameArenaView : Model -> Html Msg
@@ -432,7 +432,7 @@ gameArenaView model =
 
         canvasStyles =
             [ style "position" "absolute"
-            , style "top" "55%"
+            , style "top" "50%"
             , style "left" "50%"
             , style "transform" "translate(-50%, -50%)"
             ]
@@ -440,7 +440,7 @@ gameArenaView model =
     Canvas.toHtml ( width, height )
         canvasStyles
         [ renderBackground width height Color.black
-        , renderApple model
+        , renderFruit model
         , renderSnake model
         ]
 
@@ -450,9 +450,9 @@ renderBackground width height color =
     shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
 
 
-renderApple : Model -> Renderable
-renderApple { apple, arenaDimensions } =
-    shapes [ fill Color.red ] [ renderTile arenaDimensions apple ]
+renderFruit : Model -> Renderable
+renderFruit { fruit, arenaDimensions } =
+    shapes [ fill (Color.rgb 0.99 0.91 0.13) ] [ renderTile arenaDimensions fruit ]
 
 
 renderSnake : Model -> Renderable
@@ -475,7 +475,7 @@ snakeColor : GameState -> Color
 snakeColor state =
     case state of
         Running ->
-            Color.green
+            Color.rgb 0.38 0.7 0.8
 
         GameOver ->
             Color.red
