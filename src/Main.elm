@@ -294,6 +294,7 @@ type Msg
     | KeyPressed String
     | Turn Direction
     | EndGame
+    | Restart
 
 
 
@@ -305,6 +306,9 @@ update msg model =
     case msg of
         EndGame ->
             ( { model | gameState = GameOver }, Cmd.none )
+
+        Restart ->
+            init ()
 
         FruitEaten ->
             ( { model | score = model.score + 20 }
@@ -337,16 +341,22 @@ update msg model =
                 ( { model | fruit = fruit }, Cmd.none )
 
         KeyPressed key ->
-            let
-                direction =
-                    directionFromKey key
-            in
-            case direction of
-                Just dir ->
-                    model |> update (Turn dir)
+            case model.gameState of
+                Running ->
+                    case directionFromKey key of
+                        Just dir ->
+                            model |> update (Turn dir)
 
-                Nothing ->
-                    ( model, Cmd.none )
+                        _ ->
+                            ( model, Cmd.none )
+
+                GameOver ->
+                    case key of
+                        " " ->
+                            model |> update Restart
+
+                        _ ->
+                            ( model, Cmd.none )
 
         Turn direction ->
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
@@ -368,22 +378,22 @@ fruitGenerator { cols, rows } =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    let
+        moveSub =
+            Time.every (1000 / speedPerSecond model.score) (\_ -> Move)
+
+        timePenaltySub =
+            Time.every 1000 (\_ -> TimePenalty)
+
+        keyPressedSub =
+            Browser.Events.onKeyDown keyPressedDecoder
+    in
     case model.gameState of
         Running ->
-            let
-                moveSub =
-                    Time.every (1000 / speedPerSecond model.score) (\_ -> Move)
-
-                timePenaltySub =
-                    Time.every 1000 (\_ -> TimePenalty)
-
-                keyPressedSub =
-                    Browser.Events.onKeyDown keyPressedDecoder
-            in
             Sub.batch [ moveSub, timePenaltySub, keyPressedSub ]
 
         GameOver ->
-            Sub.none
+            keyPressedSub
 
 
 keyPressedDecoder : Decode.Decoder Msg
@@ -405,6 +415,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ headerView model.score
+        , gameOverView model.gameState
         , gameArenaView model
         ]
 
@@ -425,6 +436,31 @@ headerView score =
         [ h1 titleStyles [ Html.text "elm-snake" ]
         , div scoreStyles [ Html.text ("score: " ++ String.fromInt score) ]
         ]
+
+
+gameOverView : GameState -> Html msg
+gameOverView state =
+    let
+        styles =
+            [ style "z-index" "10"
+            , style "position" "absolute"
+            , style "width" "100%"
+            , style "color" "red"
+            , style "top" "50%"
+            , style "transform" "translateY(-50%)"
+            , style "text-align" "center"
+            , style "font-size" "200%"
+            ]
+    in
+    case state of
+        GameOver ->
+            div styles
+                [ Html.h1 [] [ Html.text "GAME OVER!" ]
+                , Html.h3 [] [ Html.text "Hit space to go again" ]
+                ]
+
+        _ ->
+            Html.text ""
 
 
 gameArenaView : Model -> Html Msg
@@ -487,4 +523,4 @@ snakeColor state =
             Color.rgb 0.38 0.7 0.8
 
         GameOver ->
-            Color.red
+            Color.rgb 0.1 0.1 0.1
