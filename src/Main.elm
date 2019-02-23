@@ -363,7 +363,7 @@ subscriptions model =
         Running ->
             let
                 moveSub =
-                    Time.every (1000 / toFloat (speedPerSecond model.score)) (\_ -> Move)
+                    Time.every (1000 / speedPerSecond model.score) (\_ -> Move)
 
                 timePenaltySub =
                     Time.every 1000 (\_ -> TimePenalty)
@@ -383,9 +383,9 @@ keyPressedDecoder =
         |> Decode.map KeyPressed
 
 
-speedPerSecond : Int -> Int
+speedPerSecond : Int -> Float
 speedPerSecond score =
-    10 + (score // 200)
+    10 + (toFloat score * (1 / 200))
 
 
 
