@@ -308,7 +308,7 @@ update msg model =
 
         FruitEaten ->
             ( { model | score = model.score + 20 }
-            , Random.generate NewFruit (fruitGenerator model.arenaDimensions)
+            , generateFruit model.arenaDimensions
             )
 
         TimePenalty ->
@@ -330,7 +330,11 @@ update msg model =
                     { model | snake = nextSnake } |> update FruitEaten
 
         NewFruit fruit ->
-            ( { model | fruit = fruit }, Cmd.none )
+            if List.member fruit model.snake.body then
+                ( model, generateFruit model.arenaDimensions )
+
+            else
+                ( { model | fruit = fruit }, Cmd.none )
 
         KeyPressed key ->
             let
@@ -346,6 +350,11 @@ update msg model =
 
         Turn direction ->
             ( { model | snake = model.snake |> turn direction }, Cmd.none )
+
+
+generateFruit : ArenaDimensions -> Cmd Msg
+generateFruit dims =
+    Random.generate NewFruit (fruitGenerator dims)
 
 
 fruitGenerator : ArenaDimensions -> Random.Generator Fruit
