@@ -190,11 +190,9 @@ move dimensions fruit snake =
             maybeNextHead
                 |> Maybe.map (\head -> head :: snake.body)
                 |> Maybe.map adjustBody
-                |> Maybe.andThen validateCollisions
                 |> Maybe.map
-                    (\body ->
-                        { snake | body = body, direction = direction, turnQueue = turnQueue }
-                    )
+                    (\body -> { snake | body = body, direction = direction, turnQueue = turnQueue })
+                |> Maybe.andThen validateCollisions
     in
     case ( maybeNextSnake, snakeFed ) of
         ( Just nextSnake, True ) ->
@@ -207,15 +205,15 @@ move dimensions fruit snake =
             Collision
 
 
-validateCollisions : List Position -> Maybe (List Position)
-validateCollisions body =
-    case body of
+validateCollisions : Snake -> Maybe Snake
+validateCollisions snake =
+    case snake.body of
         head :: tail ->
             if List.member head tail then
                 Nothing
 
             else
-                Just body
+                Just snake
 
         _ ->
             Nothing
@@ -449,7 +447,7 @@ gameOverView state =
             , style "top" "50%"
             , style "transform" "translateY(-50%)"
             , style "text-align" "center"
-            , style "font-size" "200%"
+            , style "font-size" "150%"
             ]
     in
     case state of
