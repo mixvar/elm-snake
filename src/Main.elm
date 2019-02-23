@@ -309,7 +309,7 @@ update msg model =
             init ()
 
         FruitEaten ->
-            ( { model | score = model.score + 20 }
+            ( { model | score = model.score + 10 }
             , generateFruit model.arenaDimensions
             )
 
@@ -402,7 +402,7 @@ keyPressedDecoder =
 
 speedPerSecond : Int -> Float
 speedPerSecond score =
-    9 + (toFloat score * (1 / 250))
+    10 + (toFloat score * (1 / 200))
 
 
 
