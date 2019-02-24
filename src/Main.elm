@@ -2,14 +2,18 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events
-import Canvas exposing (..)
+import Canvas
 import Color exposing (Color)
-import Html exposing (Html, div, h1)
+import Html exposing (Html)
 import Html.Attributes exposing (style)
 import Json.Decode as Decode exposing (Decoder)
-import List exposing (head, length, take)
+import List
 import Random
 import Time
+
+
+
+-- SETUP
 
 
 increment val =
@@ -18,10 +22,6 @@ increment val =
 
 decrement val =
     val - 1
-
-
-
--- SETUP
 
 
 type alias Void =
@@ -59,21 +59,8 @@ type alias ArenaDimensions =
     { unitSize : Int, cols : Int, rows : Int }
 
 
-type alias Position =
-    { col : Int, row : Int }
 
-
-type alias Fruit =
-    Position
-
-
-toPoint : ArenaDimensions -> Position -> Point
-toPoint { unitSize } { col, row } =
-    let
-        toPixels =
-            decrement >> (*) unitSize >> toFloat
-    in
-    ( toPixels col, toPixels row )
+-- MODEL -> DIRECTION
 
 
 type Direction
@@ -130,93 +117,25 @@ opposite dir =
             Up
 
 
-type alias Snake =
-    { body : List Position
-    , direction : Direction
-    , turnQueue : List Direction
-    }
+
+-- Model -> POSITION
 
 
-turn : Direction -> Snake -> Snake
-turn direction snake =
-    { snake | turnQueue = List.append snake.turnQueue [ direction ] }
+type alias Position =
+    { col : Int, row : Int }
 
 
-getNextTurn : Snake -> ( Direction, List Direction )
-getNextTurn snake =
-    case List.head snake.turnQueue of
-        Just nextDir ->
-            if nextDir == opposite snake.direction || nextDir == snake.direction then
-                getNextTurn { snake | turnQueue = List.drop 1 snake.turnQueue }
-
-            else
-                ( nextDir, List.drop 1 snake.turnQueue )
-
-        Nothing ->
-            ( snake.direction, [] )
+type alias Fruit =
+    Position
 
 
-type MoveResult
-    = Moved Snake
-    | MovedAndFed Snake
-    | Collision
-
-
-move : ArenaDimensions -> Fruit -> Snake -> MoveResult
-move dimensions fruit snake =
+toPoint : ArenaDimensions -> Position -> Canvas.Point
+toPoint { unitSize } { col, row } =
     let
-        ( direction, turnQueue ) =
-            getNextTurn snake
-
-        maybeNextHead =
-            snake.body
-                |> head
-                |> Maybe.map (transformPosition direction)
-                |> Maybe.map (toArenaPosition dimensions)
-
-        snakeFed =
-            maybeNextHead
-                |> Maybe.map ((==) fruit)
-                |> Maybe.withDefault False
-
-        adjustBody =
-            if snakeFed then
-                identity
-
-            else
-                take (length snake.body)
-
-        maybeNextSnake =
-            maybeNextHead
-                |> Maybe.map (\head -> head :: snake.body)
-                |> Maybe.map adjustBody
-                |> Maybe.map
-                    (\body -> { snake | body = body, direction = direction, turnQueue = turnQueue })
-                |> Maybe.andThen validateCollisions
+        transform =
+            decrement >> (*) unitSize >> toFloat
     in
-    case ( maybeNextSnake, snakeFed ) of
-        ( Just nextSnake, True ) ->
-            MovedAndFed nextSnake
-
-        ( Just nextSnake, False ) ->
-            Moved nextSnake
-
-        ( Nothing, _ ) ->
-            Collision
-
-
-validateCollisions : Snake -> Maybe Snake
-validateCollisions snake =
-    case snake.body of
-        head :: tail ->
-            if List.member head tail then
-                Nothing
-
-            else
-                Just snake
-
-        _ ->
-            Nothing
+    ( transform col, transform row )
 
 
 transformPosition : Direction -> Position -> Position
@@ -251,6 +170,106 @@ toArenaPosition dimensions { col, row } =
     { col = col |> bounded dimensions.cols
     , row = row |> bounded dimensions.rows
     }
+
+
+
+-- MODEL -> SNAKE
+
+
+type alias Snake =
+    { body : List Position
+    , direction : Direction
+    , turnQueue : List Direction
+    }
+
+
+enqueueTurn : Direction -> Snake -> Snake
+enqueueTurn direction snake =
+    { snake | turnQueue = List.append snake.turnQueue [ direction ] }
+
+
+type MoveResult
+    = Moved Snake
+    | MovedAndFed Snake
+    | Collision
+
+
+moveSnake : ArenaDimensions -> Fruit -> Snake -> MoveResult
+moveSnake dimensions fruit snake =
+    let
+        turnedSnake =
+            turnSnake snake
+
+        maybeNextHead =
+            snake.body
+                |> List.head
+                |> Maybe.map (transformPosition turnedSnake.direction)
+                |> Maybe.map (toArenaPosition dimensions)
+
+        snakeFed =
+            maybeNextHead
+                |> Maybe.map ((==) fruit)
+                |> Maybe.withDefault False
+
+        adjustBody =
+            if snakeFed then
+                identity
+
+            else
+                List.take (List.length snake.body)
+
+        maybeNextSnake =
+            maybeNextHead
+                |> Maybe.map (\head -> head :: snake.body)
+                |> Maybe.map adjustBody
+                |> Maybe.map (\body -> { turnedSnake | body = body })
+                |> Maybe.andThen validateCollisions
+    in
+    case ( maybeNextSnake, snakeFed ) of
+        ( Just nextSnake, True ) ->
+            MovedAndFed nextSnake
+
+        ( Just nextSnake, False ) ->
+            Moved nextSnake
+
+        ( Nothing, _ ) ->
+            Collision
+
+
+turnSnake : Snake -> Snake
+turnSnake snake =
+    case List.head snake.turnQueue of
+        Just nextDir ->
+            let
+                isTurnValid =
+                    nextDir /= opposite snake.direction && nextDir /= snake.direction
+
+                queue =
+                    List.drop 1 snake.turnQueue
+            in
+            case isTurnValid of
+                True ->
+                    { snake | direction = nextDir, turnQueue = queue }
+
+                False ->
+                    turnSnake { snake | turnQueue = queue }
+
+        Nothing ->
+            snake
+
+
+validateCollisions : Snake -> Maybe Snake
+validateCollisions snake =
+    case snake.body of
+        head :: tail ->
+            if List.member head tail then
+                Nothing
+
+            else
+                Just snake
+
+        _ ->
+            Nothing
 
 
 
@@ -319,7 +338,7 @@ update msg model =
         Move ->
             let
                 moveResult =
-                    model.snake |> move model.arenaDimensions model.fruit
+                    model.snake |> moveSnake model.arenaDimensions model.fruit
             in
             case moveResult of
                 Collision ->
@@ -357,7 +376,7 @@ update msg model =
                             ( model, Cmd.none )
 
         Turn direction ->
-            ( { model | snake = model.snake |> turn direction }, Cmd.none )
+            ( { model | snake = model.snake |> enqueueTurn direction }, Cmd.none )
 
 
 generateFruit : ArenaDimensions -> Cmd Msg
@@ -378,7 +397,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     let
         moveSub =
-            Time.every (1000 / speedPerSecond model.score) (\_ -> Move)
+            Time.every (1000 / toFloat (speedPerSecond model.score)) (\_ -> Move)
 
         timePenaltySub =
             Time.every 1000 (\_ -> TimePenalty)
@@ -400,9 +419,9 @@ keyPressedDecoder =
         |> Decode.map KeyPressed
 
 
-speedPerSecond : Int -> Float
+speedPerSecond : Int -> Int
 speedPerSecond score =
-    10 + (toFloat score * (1 / 200))
+    10 + (score // 250)
 
 
 
@@ -411,9 +430,9 @@ speedPerSecond score =
 
 view : Model -> Html Msg
 view model =
-    div []
+    Html.div []
         [ headerView model.score
-        , gameOverView model.gameState
+        , gameoverView model.gameState
         , gameArenaView model
         ]
 
@@ -430,29 +449,29 @@ headerView score =
         scoreStyles =
             [ style "font-size" "24px" ]
     in
-    div containerStyles
-        [ h1 titleStyles [ Html.text "elm-snake" ]
-        , div scoreStyles [ Html.text ("score: " ++ String.fromInt score) ]
+    Html.div containerStyles
+        [ Html.h1 titleStyles [ Html.text "elm-snake" ]
+        , Html.div scoreStyles [ Html.text ("score: " ++ String.fromInt score) ]
         ]
 
 
-gameOverView : GameState -> Html msg
-gameOverView state =
-    let
-        styles =
-            [ style "z-index" "10"
-            , style "position" "absolute"
-            , style "width" "100%"
-            , style "color" "red"
-            , style "top" "50%"
-            , style "transform" "translateY(-50%)"
-            , style "text-align" "center"
-            , style "font-size" "150%"
-            ]
-    in
+gameoverView : GameState -> Html msg
+gameoverView state =
     case state of
         GameOver ->
-            div styles
+            let
+                styles =
+                    [ style "z-index" "10"
+                    , style "position" "absolute"
+                    , style "width" "100%"
+                    , style "color" "red"
+                    , style "top" "50%"
+                    , style "transform" "translateY(-50%)"
+                    , style "text-align" "center"
+                    , style "font-size" "150%"
+                    ]
+            in
+            Html.div styles
                 [ Html.h1 [] [ Html.text "GAME OVER!" ]
                 , Html.h3 [] [ Html.text "Hit space to go again" ]
                 ]
@@ -488,30 +507,30 @@ gameArenaView model =
         ]
 
 
-renderBackground : Int -> Int -> Color -> Renderable
+renderBackground : Int -> Int -> Color -> Canvas.Renderable
 renderBackground width height color =
-    shapes [ fill color ] [ rect ( 0, 0 ) (toFloat width) (toFloat height) ]
+    Canvas.shapes [ Canvas.fill color ] [ Canvas.rect ( 0, 0 ) (toFloat width) (toFloat height) ]
 
 
-renderFruit : Model -> Renderable
+renderFruit : Model -> Canvas.Renderable
 renderFruit { fruit, arenaDimensions } =
-    shapes [ fill (Color.rgb 0.99 0.91 0.13) ] [ renderTile arenaDimensions fruit ]
+    Canvas.shapes [ Canvas.fill (Color.rgb 0.99 0.91 0.13) ] [ renderTile arenaDimensions fruit ]
 
 
-renderSnake : Model -> Renderable
+renderSnake : Model -> Canvas.Renderable
 renderSnake model =
-    shapes [ fill (snakeColor model.gameState) ]
+    Canvas.shapes [ Canvas.fill (snakeColor model.gameState) ]
         (model.snake.body |> List.map (renderTile model.arenaDimensions))
 
 
-renderTile : ArenaDimensions -> Position -> Shape
+renderTile : ArenaDimensions -> Position -> Canvas.Shape
 renderTile dims coords =
     renderSquare dims.unitSize (toPoint dims coords)
 
 
-renderSquare : Int -> Point -> Shape
+renderSquare : Int -> Canvas.Point -> Canvas.Shape
 renderSquare size point =
-    rect point (toFloat size) (toFloat size)
+    Canvas.rect point (toFloat size) (toFloat size)
 
 
 snakeColor : GameState -> Color
